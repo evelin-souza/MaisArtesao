@@ -27,19 +27,19 @@ export class UsuariosController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   @Get(':id')
   buscarPorId(@Param('id', ParseIntPipe) id: number) {
     return this.service.buscarPorId(id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards()
   @Post()
   criar(@Body() dto: CriarUsuarioDto) {
     return this.service.criar(dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @Patch(':id')
   atualizar(
     @Param('id', ParseIntPipe) id: number,
@@ -48,7 +48,8 @@ export class UsuariosController {
     return this.service.atualizar(id, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @Patch(':id/desativar')
   desativar(@Param('id', ParseIntPipe) id: number) {
     return this.service.desativar(id);
