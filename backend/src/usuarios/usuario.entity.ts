@@ -1,4 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { IsEnum } from 'class-validator';
+import { TipoUsuario } from './enums/tipo-usuario.enum';
 
 @Entity('usuario')
 export class Usuario {
@@ -18,7 +20,7 @@ export class Usuario {
   telefone: string;
 
   @Column()
-  tipo_usuario: string;
+  tipo_usuario: TipoUsuario;
 
   @Column({ default: true })
   ativo: boolean;
