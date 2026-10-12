@@ -10,7 +10,7 @@ export class Categoria {
   @PrimaryGeneratedColumn()
   id_categoria: number;
 
-  @Column({ unique: true })
+  @Column()
   nome: string;
 
   @Column({ type: 'text', nullable: true })
