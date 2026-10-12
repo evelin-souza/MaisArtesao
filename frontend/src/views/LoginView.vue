@@ -38,6 +38,19 @@
               </v-btn>
             </v-form>
           </v-card-text>
+          <v-divider class="my-2" />
+          <div class="text-center text-body-2 mb-3">Ainda não tem conta? <RouterLink to="/cadastro" class="font-weight-bold text-primary">Cadastre-se</RouterLink></div>
+          <v-card-text class="pt-0">
+            <v-expansion-panels variant="accordion">
+              <v-expansion-panel title="Acessos de demonstração">
+                <v-expansion-panel-text>
+                  <div class="text-body-2 mb-2"><strong>Admin:</strong> admin@maisartesao.com<br><strong>Senha:</strong> Admin@123</div>
+                  <div class="text-body-2 mb-2"><strong>Artesão:</strong> artesao@maisartesao.com<br><strong>Senha:</strong> Artesao@123</div>
+                  <div class="text-body-2"><strong>Cliente:</strong> cliente@maisartesao.com<br><strong>Senha:</strong> Cliente@123</div>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </v-card-text>
         </v-card>
       </v-col>
     </v-row>
@@ -59,13 +72,13 @@ const router = useRouter()
 const handleLogin = async () => {
   try {
     loading.value = true
-    await authStore.login(email.value, senha.value)
+    authStore.login(email.value, senha.value)
     
     if (authStore.user?.tipo === 'ADMIN') router.push('/admin')
     else if (authStore.user?.tipo === 'ARTESAO') router.push('/artesao')
     else router.push('/vitrine')
   } catch (error) {
-    alert('Falha na autenticação. Verifique seu e-mail e senha.')
+    alert(error instanceof Error ? error.message : 'Falha na autenticação. Verifique seu e-mail e senha.')
   } finally {
     loading.value = false
   }
