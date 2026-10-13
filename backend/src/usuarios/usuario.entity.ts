@@ -27,4 +27,12 @@ export class Usuario {
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   data_cadastro: Date;
+
+  @Column({ unique: true, length: 11, nullable: true })
+  cpf: string;
+
+  @Column({ nullable: true })
+  endereco: string;
+  
+
 }

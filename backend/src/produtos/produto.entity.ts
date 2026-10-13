@@ -12,7 +12,7 @@ import { Categoria } from '../categorias/categoria.entity';
 
 @Entity('produto')
 export class Produto {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({ name: 'id_produto' })
   id_produto: number;
 
   @ManyToOne(() => Usuario)
