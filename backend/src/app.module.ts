@@ -12,7 +12,7 @@ import { Produto } from './produtos/produto.entity';
 import { Categoria } from './categorias/categoria.entity';
 import { ProdutosModule } from './produtos/produtos.module';
 import { CategoriasModule } from './categorias/categorias.module';
-
+import { Artesao } from './artesaos/artesao.entity';
 @Module({
   imports: [
     ConfigModule.forRoot(),
