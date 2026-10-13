@@ -5,7 +5,7 @@ Sistema web para gestão e comercialização do centro de artesanato de Currais 
 ## Tecnologias
 
 * **Backend:** NestJS + TypeScript
-* **Frontend:** Next.js + TypeScript
+* **Frontend:** Vue 3 + Vite + TypeScript (Vuetify, Pinia, Axios)
 * **Banco de dados:** PostgreSQL
 * **Containerização:** Docker + Docker Compose
 
@@ -37,14 +37,19 @@ cp .env.example .env
 Confira se o `.env` possui as configurações necessárias:
 
 ```env
+PORT=3000
+FRONTEND_URL=http://localhost:5173
+JWT_SECRET=troque_por_uma_chave_secreta
+
 DB_HOST=postgres
 DB_PORT=5432
 DB_USERNAME=maisartesao_user
-DB_PASSWORD=maisartesao_password
+DB_PASSWORD=maisartesao123
 DB_DATABASE=maisartesao
-
-PORT=3000
 ```
+
+Esses valores de `DB_*` também são usados pelo `docker-compose.yml` para criar o PostgreSQL. `FRONTEND_URL` é a origem liberada no CORS do backend (aceita várias separadas por vírgula).
+
 ---
 
 ## 3. Subir o ambiente Docker
@@ -88,6 +93,23 @@ http://localhost:3000
 ```
 
 A porta `3000` do container é disponibilizada na porta `3000` da máquina local.
+
+---
+
+## 6. Subir o frontend
+
+O frontend roda fora do Docker. Em outro terminal:
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+O frontend estará disponível em `http://localhost:5173` e consome a API pela variável `VITE_API_URL` (por padrão `http://localhost:3000`).
+
+> Para criar o primeiro usuário, use `POST /usuarios` (por exemplo com `curl`) e depois entre pela tela de login.
 
 ---
 

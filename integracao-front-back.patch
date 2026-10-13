@@ -1,0 +1,1302 @@
+diff --git a/.env.example b/.env.example
+index 8390427..7e36236 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,7 +1,14 @@
++# Servidor NestJS
++PORT=3000
++# Origem(ns) permitida(s) no CORS. Separe várias por vírgula.
++FRONTEND_URL=http://localhost:5173
++
++# Autenticação
++JWT_SECRET=troque_por_uma_chave_secreta
++
++# Banco de dados (os mesmos valores são usados pelo container do PostgreSQL)
+ DB_HOST=postgres
+ DB_PORT=5432
+-DB_USERNAME=postgres
+-DB_PASSWORD=postgres
++DB_USERNAME=maisartesao_user
++DB_PASSWORD=maisartesao123
+ DB_DATABASE=maisartesao
+-
+-PORT=3000
+\ No newline at end of file
+diff --git a/README.md b/README.md
+index dc34eea..c9b382d 100644
+--- a/README.md
++++ b/README.md
+@@ -5,7 +5,7 @@ Sistema web para gestão e comercialização do centro de artesanato de Currais
+ ## Tecnologias
+ 
+ * **Backend:** NestJS + TypeScript
+-* **Frontend:** Next.js + TypeScript
++* **Frontend:** Vue 3 + Vite + TypeScript (Vuetify, Pinia, Axios)
+ * **Banco de dados:** PostgreSQL
+ * **Containerização:** Docker + Docker Compose
+ 
+@@ -37,14 +37,19 @@ cp .env.example .env
+ Confira se o `.env` possui as configurações necessárias:
+ 
+ ```env
++PORT=3000
++FRONTEND_URL=http://localhost:5173
++JWT_SECRET=troque_por_uma_chave_secreta
++
+ DB_HOST=postgres
+ DB_PORT=5432
+ DB_USERNAME=maisartesao_user
+-DB_PASSWORD=maisartesao_password
++DB_PASSWORD=maisartesao123
+ DB_DATABASE=maisartesao
+-
+-PORT=3000
+ ```
++
++Esses valores de `DB_*` também são usados pelo `docker-compose.yml` para criar o PostgreSQL. `FRONTEND_URL` é a origem liberada no CORS do backend (aceita várias separadas por vírgula).
++
+ ---
+ 
+ ## 3. Subir o ambiente Docker
+@@ -91,6 +96,23 @@ A porta `3000` do container é disponibilizada na porta `3000` da máquina local
+ 
+ ---
+ 
++## 6. Subir o frontend
++
++O frontend roda fora do Docker. Em outro terminal:
++
++```bash
++cd frontend
++cp .env.example .env
++npm install
++npm run dev
++```
++
++O frontend estará disponível em `http://localhost:5173` e consome a API pela variável `VITE_API_URL` (por padrão `http://localhost:3000`).
++
++> Para criar o primeiro usuário, use `POST /usuarios` (por exemplo com `curl`) e depois entre pela tela de login.
++
++---
++
+ # Fluxo Git da equipe
+ 
+ O desenvolvimento deve ser realizado a partir da branch `develop`.
+diff --git a/backend/.env.example b/backend/.env.example
+index 11ab557..bb75696 100644
+--- a/backend/.env.example
++++ b/backend/.env.example
+@@ -1 +1,14 @@
+-JWT_SECRET=
+\ No newline at end of file
++# Servidor NestJS
++PORT=3000
++FRONTEND_URL=http://localhost:5173
++
++# Autenticação
++JWT_SECRET=troque_por_uma_chave_secreta
++
++# Base de Dados (mesmos valores do .env da raiz / docker-compose)
++# DB_HOST=postgres dentro do Docker; use localhost ao rodar o backend fora do Docker
++DB_HOST=postgres
++DB_PORT=5432
++DB_USERNAME=maisartesao_user
++DB_PASSWORD=maisartesao123
++DB_DATABASE=maisartesao
+diff --git a/docker-compose.yml b/docker-compose.yml
+index d0ccdf8..8a7b9f6 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -4,15 +4,16 @@ services:
+     container_name: maisartesao-postgres
+     restart: unless-stopped
+     environment:
+-      POSTGRES_DB: maisartesao
+-      POSTGRES_USER: maisartesao_user
+-      POSTGRES_PASSWORD: maisartesao123
++      # Mesmas variáveis do .env usadas pelo backend (fonte única das credenciais)
++      POSTGRES_DB: ${DB_DATABASE:-maisartesao}
++      POSTGRES_USER: ${DB_USERNAME:-maisartesao_user}
++      POSTGRES_PASSWORD: ${DB_PASSWORD:-maisartesao123}
+     ports:
+       - "5432:5432"
+     volumes:
+       - postgres_data:/var/lib/postgresql/data
+     healthcheck:
+-      test: ["CMD-SHELL", "pg_isready -U maisartesao_user -d maisartesao"]
++      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+       interval: 5s
+       timeout: 5s
+       retries: 5
+diff --git a/frontend/.env.example b/frontend/.env.example
+index cd41370..6825dfa 100644
+--- a/frontend/.env.example
++++ b/frontend/.env.example
+@@ -1 +1,3 @@
+-VITE_API_URL=http://localhost:3000
+\ No newline at end of file
++# URL base da API (backend NestJS).
++# Se omitida, o frontend usa '/api' (proxy do Vite -> http://localhost:3000, ver vite.config.ts)
++VITE_API_URL=http://localhost:3000
+diff --git a/frontend/documenta_o_do_projeto.md b/frontend/documenta_o_do_projeto.md
+index 43ace01..92fcd7e 100644
+--- a/frontend/documenta_o_do_projeto.md
++++ b/frontend/documenta_o_do_projeto.md
+@@ -64,7 +64,7 @@ npm install
+ Se necessário, cria um arquivo `.env` na raiz do projeto com o endereço da tua API backend:
+ 
+ ```env
+-VITE_API_BASE_URL=http://localhost:3000
++VITE_API_URL=http://localhost:3000
+ ```
+ 
+ ### 4. Iniciar o Servidor de Desenvolvimento
+diff --git a/frontend/src/App.vue b/frontend/src/App.vue
+index 2d1cf55..07349cb 100644
+--- a/frontend/src/App.vue
++++ b/frontend/src/App.vue
+@@ -3,9 +3,20 @@
+     <v-main>
+       <router-view />
+     </v-main>
++
++    <!-- Mensagens globais de sucesso/erro (ver stores/notification.store.ts) -->
++    <v-snackbar v-model="notification.show" :color="notification.color" :timeout="4000" location="bottom right">
++      {{ notification.message }}
++      <template #actions>
++        <v-btn variant="text" @click="notification.show = false">Fechar</v-btn>
++      </template>
++    </v-snackbar>
+   </v-app>
+ </template>
+ 
+ <script setup lang="ts">
+-// O App.vue principal atua apenas como o container das rotas
+-</script>
+\ No newline at end of file
++import { useNotificationStore } from '@/stores/notification.store'
++
++// O App.vue atua como container das rotas e hospeda o snackbar global
++const notification = useNotificationStore()
++</script>
+diff --git a/frontend/src/api.ts b/frontend/src/api.ts
+index 7ea9a89..6825ffc 100644
+--- a/frontend/src/api.ts
++++ b/frontend/src/api.ts
+@@ -1,33 +1,2 @@
+-import axios, { AxiosError } from 'axios';
+-
+-export const api = axios.create({
+-  baseURL: import.meta.env.VITE_API_URL || '/api',
+-  withCredentials: true,
+-});
+-
+-
+-api.interceptors.request.use((config) => {
+-  const token = localStorage.getItem('token');
+-  if (token && config.headers) {
+-    config.headers.Authorization = `Bearer ${token}`;
+-  }
+-  return config;
+-});
+-
+-api.interceptors.response.use(
+-  (response) => response,
+-  (error: AxiosError) => {
+-    if (error.response?.status === 401) {
+-      localStorage.removeItem('token');
+-
+-      // Evita loop se o erro 401 ocorreu na própria página de login
+-      const isLoginPage = window.location.pathname === '/login';
+-      const isLoginRequest = error.config?.url?.includes('/login');
+-
+-      if (!isLoginPage && !isLoginRequest) {
+-        window.location.href = '/login';
+-      }
+-    }
+-    return Promise.reject(error);
+-  }
+-);
+\ No newline at end of file
++// Mantido por compatibilidade: o cliente HTTP único está em '@/services/api'.
++export { api } from '@/services/api'
+diff --git a/frontend/src/components/ProductFormDialog.vue b/frontend/src/components/ProductFormDialog.vue
+index 2d90d29..2aed403 100644
+--- a/frontend/src/components/ProductFormDialog.vue
++++ b/frontend/src/components/ProductFormDialog.vue
+@@ -50,7 +50,7 @@
+ </template>
+ 
+ <script setup lang="ts">
+-import { reactive, watch } from 'vue'
++import { reactive, ref, watch } from 'vue'
+ 
+ export interface ProductFormData {
+   id?: number
+@@ -69,7 +69,7 @@ interface Props {
+ const props = defineProps<Props>()
+ const emit = defineEmits(['update:modelValue', 'save'])
+ 
+-const isEdit = reactive({ value: false })
++const isEdit = ref(false)
+ 
+ const formData = reactive<ProductFormData>({
+   nome: '',
+diff --git a/frontend/src/components/UserFormDialog.vue b/frontend/src/components/UserFormDialog.vue
+new file mode 100644
+index 0000000..5a203bd
+--- /dev/null
++++ b/frontend/src/components/UserFormDialog.vue
+@@ -0,0 +1,149 @@
++<template>
++  <v-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" max-width="600px">
++    <v-card rounded="lg" class="pa-2">
++      <v-card-title class="text-h6 font-weight-bold">
++        {{ isEdit ? 'Editar Usuário' : 'Cadastrar Novo Usuário' }}
++      </v-card-title>
++
++      <v-card-text>
++        <v-form ref="formRef" @submit.prevent="handleSubmit">
++          <v-text-field
++            v-model="formData.nome"
++            label="Nome"
++            variant="outlined"
++            :rules="[obrigatorio]"
++          />
++          <v-text-field
++            v-model="formData.email"
++            label="E-mail"
++            type="email"
++            variant="outlined"
++            :rules="[obrigatorio, emailValido]"
++          />
++          <v-text-field
++            v-model="formData.telefone"
++            label="Telefone"
++            variant="outlined"
++            :rules="[obrigatorio]"
++          />
++          <v-select
++            v-model="formData.tipo_usuario"
++            :items="TIPOS_USUARIO"
++            label="Tipo de Perfil"
++            variant="outlined"
++            :disabled="bloquearTipo"
++            :hint="bloquearTipo ? 'Você não pode alterar o seu próprio perfil.' : undefined"
++            :persistent-hint="bloquearTipo"
++            :rules="[obrigatorio]"
++          />
++          <v-text-field
++            v-model="formData.senha"
++            :label="isEdit ? 'Nova senha (deixe em branco para manter)' : 'Senha'"
++            type="password"
++            variant="outlined"
++            autocomplete="new-password"
++            :rules="[senhaValida]"
++          />
++
++          <div class="d-flex justify-end gap-2 mt-4">
++            <v-btn variant="text" @click="$emit('update:modelValue', false)">Cancelar</v-btn>
++            <v-btn type="submit" color="success" :loading="loading">
++              {{ isEdit ? 'Salvar Alterações' : 'Cadastrar' }}
++            </v-btn>
++          </div>
++        </v-form>
++      </v-card-text>
++    </v-card>
++  </v-dialog>
++</template>
++
++<script setup lang="ts">
++import { reactive, ref, watch } from 'vue'
++import {
++  TIPOS_USUARIO,
++  type AtualizarUsuarioPayload,
++  type CriarUsuarioPayload,
++  type TipoUsuario,
++  type Usuario,
++  type UsuarioFormSubmit,
++} from '@/types/usuario'
++
++interface Props {
++  modelValue: boolean
++  initialData?: Usuario | null
++  loading?: boolean
++  bloquearTipo?: boolean
++}
++
++const props = defineProps<Props>()
++const emit = defineEmits<{
++  (e: 'update:modelValue', value: boolean): void
++  (e: 'save', value: UsuarioFormSubmit): void
++}>()
++
++const formRef = ref<{ validate: () => Promise<{ valid: boolean }> } | null>(null)
++const isEdit = ref(false)
++
++const formData = reactive({
++  nome: '',
++  email: '',
++  telefone: '',
++  tipo_usuario: 'CLIENTE' as TipoUsuario,
++  senha: '',
++})
++
++// Preenche o formulário toda vez que o diálogo é aberto
++watch(
++  () => props.modelValue,
++  (aberto) => {
++    if (!aberto) return
++    if (props.initialData) {
++      isEdit.value = true
++      formData.nome = props.initialData.nome
++      formData.email = props.initialData.email
++      formData.telefone = props.initialData.telefone
++      formData.tipo_usuario = props.initialData.tipo_usuario
++      formData.senha = ''
++    } else {
++      isEdit.value = false
++      formData.nome = ''
++      formData.email = ''
++      formData.telefone = ''
++      formData.tipo_usuario = 'CLIENTE'
++      formData.senha = ''
++    }
++  },
++  { immediate: true },
++)
++
++// Regras alinhadas aos DTOs do backend (CriarUsuarioDto / AtualizarUsuarioDto)
++const obrigatorio = (v: string) => !!(v && v.trim()) || 'Campo obrigatório'
++const emailValido = (v: string) => /^\S+@\S+\.\S+$/.test(v) || 'E-mail inválido'
++const senhaValida = (v: string) => {
++  if (isEdit.value && !v) return true // na edição a senha é opcional
++  if (!v) return 'Campo obrigatório'
++  return v.length >= 6 || 'A senha deve ter pelo menos 6 caracteres'
++}
++
++const handleSubmit = async () => {
++  const resultado = await formRef.value?.validate()
++  if (!resultado?.valid) return
++
++  // Envia somente os campos aceitos pelos DTOs (o backend rejeita campos extras)
++  const base = {
++    nome: formData.nome.trim(),
++    email: formData.email.trim(),
++    telefone: formData.telefone.trim(),
++    tipo_usuario: formData.tipo_usuario,
++  }
++
++  if (isEdit.value && props.initialData) {
++    const payload: AtualizarUsuarioPayload = { ...base }
++    if (formData.senha) payload.senha = formData.senha
++    emit('save', { id: props.initialData.id_usuario, payload })
++  } else {
++    const payload: CriarUsuarioPayload = { ...base, senha: formData.senha }
++    emit('save', { id: null, payload })
++  }
++}
++</script>
+diff --git a/frontend/src/router/index.ts b/frontend/src/router/index.ts
+index 80a7365..5ea3448 100644
+--- a/frontend/src/router/index.ts
++++ b/frontend/src/router/index.ts
+@@ -1,5 +1,5 @@
+ import { createRouter, createWebHistory } from 'vue-router'
+-import { useAuthStore } from '@/stores/auth.store'
++import { rotaPorTipo, useAuthStore } from '@/stores/auth.store'
+ 
+ import LoginView from '@/views/LoginView.vue'
+ import AdminDashboard from '@/views/AdminDashboard.vue'
+@@ -31,18 +31,21 @@ export const router = createRouter({
+   routes,
+ })
+ 
+-router.beforeEach((to, from, next) => {
++router.beforeEach((to) => {
++  if (!to.meta.requiresAuth) return true
++
+   const authStore = useAuthStore()
+ 
+-  if (to.meta.requiresAuth) {
+-    if (!authStore.token) {
+-      return next('/login')
+-    }
+-    if (to.meta.role && authStore.user?.tipo !== to.meta.role) {
+-      if (authStore.user?.tipo === 'ADMIN') return next('/admin')
+-      if (authStore.user?.tipo === 'ARTESAO') return next('/artesao')
+-      if (authStore.user?.tipo === 'CLIENTE') return next('/vitrine')
+-    }
++  // Sem token, token expirado ou sem dados do usuário: volta para o login
++  if (!authStore.isAuthenticated || !authStore.user) {
++    authStore.logout()
++    return '/login'
++  }
++
++  // Perfil diferente do exigido pela rota: redireciona para a tela do próprio perfil
++  if (to.meta.role && authStore.user.tipo !== to.meta.role) {
++    return rotaPorTipo(authStore.user.tipo)
+   }
+-  next()
+-})
+\ No newline at end of file
++
++  return true
++})
+diff --git a/frontend/src/services/api.ts b/frontend/src/services/api.ts
+index 804d54a..9272f9a 100644
+--- a/frontend/src/services/api.ts
++++ b/frontend/src/services/api.ts
+@@ -1,13 +1,40 @@
+-import axios from 'axios'
+-
+-export const api = axios.create({
+-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+-})
+-
+-api.interceptors.request.use((config) => {
+-  const token = localStorage.getItem('token')
+-  if (token) {
+-    config.headers.Authorization = `Bearer ${token}`
+-  }
+-  return config
+-})
+\ No newline at end of file
++import axios from 'axios'
++
++/**
++ * Cliente HTTP único da aplicação.
++ *
++ * A URL base vem de VITE_API_URL (ver frontend/.env.example).
++ * Se a variável não estiver definida, usa '/api', que o servidor de
++ * desenvolvimento do Vite encaminha para o backend (ver vite.config.ts).
++ */
++export const api = axios.create({
++  baseURL: import.meta.env.VITE_API_URL || '/api',
++})
++
++api.interceptors.request.use((config) => {
++  const token = localStorage.getItem('token')
++  if (token) {
++    config.headers.Authorization = `Bearer ${token}`
++  }
++  return config
++})
++
++api.interceptors.response.use(
++  (response) => response,
++  (error) => {
++    if (error?.response?.status === 401) {
++      // Evita loop se o 401 veio da própria tentativa de login
++      const isLoginRequest = String(error.config?.url ?? '').includes('/auth/login')
++      const isLoginPage = window.location.pathname === '/login'
++
++      if (!isLoginRequest) {
++        localStorage.removeItem('token')
++        localStorage.removeItem('user')
++        if (!isLoginPage) {
++          window.location.href = '/login'
++        }
++      }
++    }
++    return Promise.reject(error)
++  },
++)
+diff --git a/frontend/src/services/auth.service.ts b/frontend/src/services/auth.service.ts
+new file mode 100644
+index 0000000..dd21f63
+--- /dev/null
++++ b/frontend/src/services/auth.service.ts
+@@ -0,0 +1,13 @@
++import { api } from '@/services/api'
++
++export interface LoginResponse {
++  access_token: string
++}
++
++export const authService = {
++  /** POST /auth/login  (LoginDto: email, senha) */
++  async login(email: string, senha: string): Promise<LoginResponse> {
++    const { data } = await api.post<LoginResponse>('/auth/login', { email, senha })
++    return data
++  },
++}
+diff --git a/frontend/src/services/usuarios.service.ts b/frontend/src/services/usuarios.service.ts
+new file mode 100644
+index 0000000..ce6d2f0
+--- /dev/null
++++ b/frontend/src/services/usuarios.service.ts
+@@ -0,0 +1,38 @@
++import { api } from '@/services/api'
++import type {
++  AtualizarUsuarioPayload,
++  CriarUsuarioPayload,
++  Usuario,
++} from '@/types/usuario'
++
++export const usuariosService = {
++  /** GET /usuarios  (ADMIN) */
++  async listar(): Promise<Usuario[]> {
++    const { data } = await api.get<Usuario[]>('/usuarios')
++    return data
++  },
++
++  /** GET /usuarios/:id  (qualquer usuário autenticado) */
++  async buscarPorId(id: number): Promise<Usuario> {
++    const { data } = await api.get<Usuario>(`/usuarios/${id}`)
++    return data
++  },
++
++  /** POST /usuarios  (público) */
++  async criar(payload: CriarUsuarioPayload): Promise<Usuario> {
++    const { data } = await api.post<Usuario>('/usuarios', payload)
++    return data
++  },
++
++  /** PATCH /usuarios/:id  (ADMIN) */
++  async atualizar(id: number, payload: AtualizarUsuarioPayload): Promise<Usuario> {
++    const { data } = await api.patch<Usuario>(`/usuarios/${id}`, payload)
++    return data
++  },
++
++  /** PATCH /usuarios/:id/desativar  (ADMIN) — o backend não possui DELETE */
++  async desativar(id: number): Promise<Usuario> {
++    const { data } = await api.patch<Usuario>(`/usuarios/${id}/desativar`)
++    return data
++  },
++}
+diff --git a/frontend/src/stores/auth.store.ts b/frontend/src/stores/auth.store.ts
+index f7088b0..6bbec71 100644
+--- a/frontend/src/stores/auth.store.ts
++++ b/frontend/src/stores/auth.store.ts
+@@ -1,32 +1,92 @@
+-import { defineStore } from 'pinia'
+-import { api } from '@/services/api'
+-
+-export interface User {
+-  id: string
+-  email: string
+-  nome: string
+-  tipo: 'ADMIN' | 'ARTESAO' | 'CLIENTE'
+-}
+-
+-export const useAuthStore = defineStore('auth', {
+-  state: () => ({
+-    user: JSON.parse(localStorage.getItem('user') || 'null') as User | null,
+-    token: localStorage.getItem('token') || '',
+-  }),
+-  actions: {
+-    async login(email: string, senha: string) {
+-      const response = await api.post('/auth/login', { email, senha })
+-      this.token = response.data.access_token
+-      this.user = response.data.usuario
+-
+-      localStorage.setItem('token', this.token)
+-      localStorage.setItem('user', JSON.stringify(this.user))
+-    },
+-    logout() {
+-      this.token = ''
+-      this.user = null
+-      localStorage.removeItem('token')
+-      localStorage.removeItem('user')
+-    }
+-  }
+-})
+\ No newline at end of file
++import { defineStore } from 'pinia'
++import { authService } from '@/services/auth.service'
++import { usuariosService } from '@/services/usuarios.service'
++import { decodeJwt, isTokenExpired } from '@/utils/jwt'
++import type { TipoUsuario } from '@/types/usuario'
++
++export interface User {
++  id: number
++  email: string
++  nome: string
++  tipo: TipoUsuario
++}
++
++/** Rota inicial de cada perfil */
++export function rotaPorTipo(tipo?: TipoUsuario | null): string {
++  if (tipo === 'ADMIN') return '/admin'
++  if (tipo === 'ARTESAO') return '/artesao'
++  if (tipo === 'CLIENTE') return '/vitrine'
++  return '/login'
++}
++
++function lerUsuarioSalvo(): User | null {
++  try {
++    return JSON.parse(localStorage.getItem('user') || 'null') as User | null
++  } catch {
++    return null
++  }
++}
++
++function lerTokenSalvo(): string {
++  const token = localStorage.getItem('token') || ''
++  // Token expirado (o backend emite com validade de 1h): descarta a sessão
++  if (token && isTokenExpired(token)) {
++    localStorage.removeItem('token')
++    localStorage.removeItem('user')
++    return ''
++  }
++  return token
++}
++
++export const useAuthStore = defineStore('auth', {
++  state: () => {
++    const token = lerTokenSalvo()
++    return {
++      user: (token ? lerUsuarioSalvo() : null) as User | null,
++      token,
++    }
++  },
++  getters: {
++    isAuthenticated: (state) => !!state.token && !isTokenExpired(state.token),
++  },
++  actions: {
++    /**
++     * O backend responde ao login apenas com { access_token }.
++     * O id e o perfil vêm no payload do JWT; o nome é buscado em GET /usuarios/:id.
++     */
++    async login(email: string, senha: string) {
++      const { access_token } = await authService.login(email, senha)
++
++      const payload = decodeJwt(access_token)
++      if (!payload) {
++        throw new Error('Resposta de login inválida.')
++      }
++
++      // O interceptor do Axios lê o token do localStorage
++      localStorage.setItem('token', access_token)
++
++      let nome = payload.email
++      try {
++        const usuario = await usuariosService.buscarPorId(payload.sub)
++        nome = usuario.nome
++      } catch {
++        // Falha ao buscar o perfil não deve impedir o login; usa o e-mail como nome de exibição
++      }
++
++      this.token = access_token
++      this.user = {
++        id: payload.sub,
++        email: payload.email,
++        nome,
++        tipo: payload.tipo_usuario,
++      }
++      localStorage.setItem('user', JSON.stringify(this.user))
++    },
++    logout() {
++      this.token = ''
++      this.user = null
++      localStorage.removeItem('token')
++      localStorage.removeItem('user')
++    },
++  },
++})
+diff --git a/frontend/src/stores/notification.store.ts b/frontend/src/stores/notification.store.ts
+new file mode 100644
+index 0000000..d0d82a5
+--- /dev/null
++++ b/frontend/src/stores/notification.store.ts
+@@ -0,0 +1,28 @@
++import { defineStore } from 'pinia'
++
++type Cor = 'success' | 'error' | 'info'
++
++/** Mensagens de sucesso/erro exibidas em um único snackbar global (ver App.vue). */
++export const useNotificationStore = defineStore('notification', {
++  state: () => ({
++    show: false,
++    message: '',
++    color: 'success' as Cor,
++  }),
++  actions: {
++    notify(message: string, color: Cor) {
++      this.message = message
++      this.color = color
++      this.show = true
++    },
++    success(message: string) {
++      this.notify(message, 'success')
++    },
++    error(message: string) {
++      this.notify(message, 'error')
++    },
++    info(message: string) {
++      this.notify(message, 'info')
++    },
++  },
++})
+diff --git a/frontend/src/types/usuario.ts b/frontend/src/types/usuario.ts
+new file mode 100644
+index 0000000..fd0cdaf
+--- /dev/null
++++ b/frontend/src/types/usuario.ts
+@@ -0,0 +1,34 @@
++// Tipos que espelham os DTOs e as respostas do backend (src/usuarios).
++
++export type TipoUsuario = 'ADMIN' | 'ARTESAO' | 'CLIENTE'
++
++export const TIPOS_USUARIO: readonly TipoUsuario[] = ['ADMIN', 'ARTESAO', 'CLIENTE']
++
++/** Resposta do backend (UsuariosService.removerSenha) */
++export interface Usuario {
++  id_usuario: number
++  nome: string
++  email: string
++  telefone: string
++  tipo_usuario: TipoUsuario
++  ativo: boolean
++  data_cadastro: string
++}
++
++/** CriarUsuarioDto */
++export interface CriarUsuarioPayload {
++  nome: string
++  email: string
++  senha: string
++  telefone: string
++  tipo_usuario: TipoUsuario
++}
++
++/** AtualizarUsuarioDto (todos opcionais; `ativo` é ignorado pelo service, por isso não é enviado) */
++export type AtualizarUsuarioPayload = Partial<CriarUsuarioPayload>
++
++/** Evento emitido pelo UserFormDialog: id nulo = cadastro; id preenchido = edição */
++export interface UsuarioFormSubmit {
++  id: number | null
++  payload: CriarUsuarioPayload | AtualizarUsuarioPayload
++}
+diff --git a/frontend/src/utils/http-error.ts b/frontend/src/utils/http-error.ts
+new file mode 100644
+index 0000000..58de40e
+--- /dev/null
++++ b/frontend/src/utils/http-error.ts
+@@ -0,0 +1,39 @@
++/**
++ * Converte um erro de requisição em uma mensagem amigável para o usuário.
++ * Não depende do axios: apenas inspeta o formato do erro.
++ */
++interface ErroHttp {
++  response?: { status?: number; data?: { message?: string | string[] } }
++  request?: unknown
++}
++
++export function getErrorMessage(error: unknown, fallback = 'Ocorreu um erro inesperado.'): string {
++  const err = error as ErroHttp | null
++
++  if (err && typeof err === 'object' && 'response' in err && err.response) {
++    const message = err.response.data?.message
++
++    if (Array.isArray(message) && message.length > 0) return message.join('; ')
++    if (typeof message === 'string' && message) return message
++
++    switch (err.response.status) {
++      case 401:
++        return 'Sessão inválida ou expirada. Faça login novamente.'
++      case 403:
++        return 'Você não tem permissão para realizar esta ação.'
++      case 404:
++        return 'Registro não encontrado.'
++      case 409:
++        return 'Já existe um registro com estes dados.'
++      default:
++        return fallback
++    }
++  }
++
++  // Requisição enviada, mas sem resposta (backend fora do ar, CORS, rede)
++  if (err && typeof err === 'object' && 'request' in err) {
++    return 'Não foi possível conectar ao servidor. Verifique se o backend está em execução.'
++  }
++
++  return error instanceof Error && error.message ? error.message : fallback
++}
+diff --git a/frontend/src/utils/jwt.ts b/frontend/src/utils/jwt.ts
+new file mode 100644
+index 0000000..845e7e5
+--- /dev/null
++++ b/frontend/src/utils/jwt.ts
+@@ -0,0 +1,33 @@
++/**
++ * Payload emitido pelo backend em AuthService.login():
++ * { sub: id_usuario, email, tipo_usuario } + iat/exp padrão do JWT.
++ */
++export interface JwtPayload {
++  sub: number
++  email: string
++  tipo_usuario: 'ADMIN' | 'ARTESAO' | 'CLIENTE'
++  iat?: number
++  exp?: number
++}
++
++/** Decodifica o payload de um JWT (sem validar assinatura — isso é papel do backend). */
++export function decodeJwt(token: string): JwtPayload | null {
++  try {
++    const parte = token.split('.')[1]
++    if (!parte) return null
++
++    const base64 = parte.replace(/-/g, '+').replace(/_/g, '/')
++    const preenchido = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
++    const bytes = Uint8Array.from(atob(preenchido), (c) => c.charCodeAt(0))
++    return JSON.parse(new TextDecoder().decode(bytes)) as JwtPayload
++  } catch {
++    return null
++  }
++}
++
++export function isTokenExpired(token: string): boolean {
++  const payload = decodeJwt(token)
++  if (!payload) return true
++  if (!payload.exp) return false
++  return payload.exp * 1000 <= Date.now()
++}
+diff --git a/frontend/src/views/AdminDashboard.vue b/frontend/src/views/AdminDashboard.vue
+index 5b8febe..d3f805f 100644
+--- a/frontend/src/views/AdminDashboard.vue
++++ b/frontend/src/views/AdminDashboard.vue
+@@ -1,45 +1,195 @@
+-<template>
+-  <div>
+-    <Navbar />
+-    <v-container class="mt-6">
+-      <h1 class="text-h4 mb-6 font-weight-bold">Painel Administrativo — Gestão de Usuários</h1>
+-
+-      <v-data-table :headers="headers" :items="usuarios" class="elevation-1">
+-        <template #item.tipo="{ item }">
+-          <v-chip :color="getChipColor(item.tipo)" size="small" variant="flat">
+-            {{ item.tipo }}
+-          </v-chip>
+-        </template>
+-      </v-data-table>
+-    </v-container>
+-  </div>
+-</template>
+-
+-<script setup lang="ts">
+-import { ref, onMounted } from 'vue'
+-import { api } from '@/services/api'
+-import Navbar from '@/components/Navbar.vue'
+-
+-const headers = [
+-  { title: 'Nome', key: 'nome' },
+-  { title: 'E-mail', key: 'email' },
+-  { title: 'Tipo de Perfil', key: 'tipo' }
+-]
+-
+-const usuarios = ref([])
+-
+-onMounted(async () => {
+-  try {
+-    const response = await api.get('/usuarios')
+-    usuarios.value = response.data
+-  } catch (error) {
+-    console.error('Erro ao carregar usuários:', error)
+-  }
+-})
+-
+-const getChipColor = (tipo: string) => {
+-  if (tipo === 'ADMIN') return 'error'
+-  if (tipo === 'ARTESAO') return 'warning'
+-  return 'info'
+-}
+-</script>
+\ No newline at end of file
++<template>
++  <div>
++    <Navbar />
++    <v-container class="mt-6">
++      <v-row class="mb-4" align="center">
++        <v-col>
++          <h1 class="text-h4 font-weight-bold">Painel Administrativo — Gestão de Usuários</h1>
++        </v-col>
++        <v-col class="text-right" cols="auto">
++          <v-btn color="primary" prepend-icon="mdi-plus" @click="abrirModalCadastro">
++            Novo Usuário
++          </v-btn>
++        </v-col>
++      </v-row>
++
++      <v-alert v-if="errorMessage" type="error" variant="tonal" class="mb-4">
++        {{ errorMessage }}
++        <template #append>
++          <v-btn variant="text" @click="carregarUsuarios">Tentar novamente</v-btn>
++        </template>
++      </v-alert>
++
++      <v-data-table
++        :headers="headers"
++        :items="usuarios"
++        :loading="loading"
++        loading-text="Carregando usuários..."
++        no-data-text="Nenhum usuário encontrado"
++        class="elevation-1"
++      >
++        <template #item.tipo_usuario="{ item }">
++          <v-chip :color="getChipColor(item.tipo_usuario)" size="small" variant="flat">
++            {{ item.tipo_usuario }}
++          </v-chip>
++        </template>
++        <template #item.ativo="{ item }">
++          <v-chip :color="item.ativo ? 'success' : 'grey'" size="small" variant="tonal">
++            {{ item.ativo ? 'Ativo' : 'Inativo' }}
++          </v-chip>
++        </template>
++        <template #item.acoes="{ item }">
++          <v-btn
++            icon="mdi-pencil"
++            size="small"
++            variant="text"
++            color="primary"
++            title="Editar"
++            @click="abrirModalEdicao(item)"
++          />
++          <v-btn
++            icon="mdi-account-off"
++            size="small"
++            variant="text"
++            color="error"
++            title="Desativar"
++            :disabled="!item.ativo || ehUsuarioLogado(item)"
++            @click="usuarioParaDesativar = item"
++          />
++        </template>
++      </v-data-table>
++
++      <!-- Cadastro / edição -->
++      <UserFormDialog
++        v-model="dialog"
++        :initial-data="usuarioSelecionado"
++        :loading="salvando"
++        :bloquear-tipo="!!usuarioSelecionado && ehUsuarioLogado(usuarioSelecionado)"
++        @save="salvarUsuario"
++      />
++
++      <!-- Confirmação de desativação -->
++      <v-dialog :model-value="!!usuarioParaDesativar" max-width="420px" @update:model-value="usuarioParaDesativar = null">
++        <v-card rounded="lg">
++          <v-card-title class="text-h6 font-weight-bold">Desativar usuário</v-card-title>
++          <v-card-text>
++            Deseja realmente desativar <strong>{{ usuarioParaDesativar?.nome }}</strong>?
++            Ele não conseguirá mais entrar no sistema.
++          </v-card-text>
++          <v-card-actions class="justify-end">
++            <v-btn variant="text" @click="usuarioParaDesativar = null">Cancelar</v-btn>
++            <v-btn color="error" :loading="desativando" @click="confirmarDesativacao">Desativar</v-btn>
++          </v-card-actions>
++        </v-card>
++      </v-dialog>
++    </v-container>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { ref, onMounted } from 'vue'
++import Navbar from '@/components/Navbar.vue'
++import UserFormDialog from '@/components/UserFormDialog.vue'
++import { usuariosService } from '@/services/usuarios.service'
++import { useAuthStore } from '@/stores/auth.store'
++import { useNotificationStore } from '@/stores/notification.store'
++import { getErrorMessage } from '@/utils/http-error'
++import type { CriarUsuarioPayload, Usuario, UsuarioFormSubmit } from '@/types/usuario'
++
++const authStore = useAuthStore()
++const notification = useNotificationStore()
++
++const headers = [
++  { title: 'Nome', key: 'nome' },
++  { title: 'E-mail', key: 'email' },
++  { title: 'Telefone', key: 'telefone' },
++  { title: 'Tipo de Perfil', key: 'tipo_usuario' },
++  { title: 'Status', key: 'ativo' },
++  { title: 'Ações', key: 'acoes', sortable: false }
++]
++
++const usuarios = ref<Usuario[]>([])
++const loading = ref(false)
++const errorMessage = ref('')
++
++const dialog = ref(false)
++const usuarioSelecionado = ref<Usuario | null>(null)
++const salvando = ref(false)
++
++const usuarioParaDesativar = ref<Usuario | null>(null)
++const desativando = ref(false)
++
++const carregarUsuarios = async () => {
++  try {
++    loading.value = true
++    errorMessage.value = ''
++    usuarios.value = await usuariosService.listar()
++  } catch (error) {
++    errorMessage.value = getErrorMessage(error, 'Não foi possível carregar os usuários.')
++  } finally {
++    loading.value = false
++  }
++}
++
++onMounted(carregarUsuarios)
++
++const ehUsuarioLogado = (usuario: Usuario) => usuario.id_usuario === authStore.user?.id
++
++const abrirModalCadastro = () => {
++  usuarioSelecionado.value = null
++  dialog.value = true
++}
++
++const abrirModalEdicao = (usuario: Usuario) => {
++  usuarioSelecionado.value = { ...usuario }
++  dialog.value = true
++}
++
++const substituirNaLista = (atualizado: Usuario) => {
++  usuarios.value = usuarios.value.map((u) =>
++    u.id_usuario === atualizado.id_usuario ? atualizado : u,
++  )
++}
++
++const salvarUsuario = async ({ id, payload }: UsuarioFormSubmit) => {
++  try {
++    salvando.value = true
++
++    if (id) {
++      substituirNaLista(await usuariosService.atualizar(id, payload))
++      notification.success('Usuário atualizado com sucesso.')
++    } else {
++      const criado = await usuariosService.criar(payload as CriarUsuarioPayload)
++      usuarios.value = [...usuarios.value, criado]
++      notification.success('Usuário cadastrado com sucesso.')
++    }
++
++    dialog.value = false
++  } catch (error) {
++    notification.error(getErrorMessage(error, 'Não foi possível salvar o usuário.'))
++  } finally {
++    salvando.value = false
++  }
++}
++
++const confirmarDesativacao = async () => {
++  if (!usuarioParaDesativar.value) return
++
++  try {
++    desativando.value = true
++    substituirNaLista(await usuariosService.desativar(usuarioParaDesativar.value.id_usuario))
++    notification.success('Usuário desativado com sucesso.')
++    usuarioParaDesativar.value = null
++  } catch (error) {
++    notification.error(getErrorMessage(error, 'Não foi possível desativar o usuário.'))
++  } finally {
++    desativando.value = false
++  }
++}
++
++const getChipColor = (tipo: string) => {
++  if (tipo === 'ADMIN') return 'error'
++  if (tipo === 'ARTESAO') return 'warning'
++  return 'info'
++}
++</script>
+diff --git a/frontend/src/views/ArtesaoDashboard.vue b/frontend/src/views/ArtesaoDashboard.vue
+index 1fd8b9b..3a24baf 100644
+--- a/frontend/src/views/ArtesaoDashboard.vue
++++ b/frontend/src/views/ArtesaoDashboard.vue
+@@ -51,6 +51,8 @@ const headers = [
+   { title: 'Ações', key: 'acoes', sortable: false }
+ ]
+ 
++// TODO: o backend ainda não possui módulo/endpoints de produtos (não há /produtos).
++// Enquanto isso, a lista e o cadastro continuam locais. Ao criar a API, trocar por um service.
+ const produtos = ref<ProductFormData[]>([
+   { id: 1, nome: 'Vaso de Argila Currais Novos', descricao: 'Feito à mão no Seridó', preco: 45.0, foto: 'https://picsum.photos/200' }
+ ])
+diff --git a/frontend/src/views/ClienteVitrine.vue b/frontend/src/views/ClienteVitrine.vue
+index a8cd8df..2fb0af6 100644
+--- a/frontend/src/views/ClienteVitrine.vue
++++ b/frontend/src/views/ClienteVitrine.vue
+@@ -25,6 +25,8 @@ import { ref } from 'vue'
+ import Navbar from '@/components/Navbar.vue'
+ import ProductCard from '@/components/ProductCard.vue'
+ 
++// TODO: o backend ainda não possui módulo/endpoints de produtos (não há /produtos).
++// Enquanto isso, a vitrine continua com dados locais. Ao criar a API, trocar por um service.
+ const produtos = ref([
+   { id: 1, nome: 'Vaso de Argila Currais Novos', descricao: 'Feito à mão no Seridó', preco: 45.0, foto: 'https://picsum.photos/200' },
+   { id: 2, nome: 'Bordado Tradicional', descricao: 'Bordado exclusivo feito por artesãs locais', preco: 80.0, foto: 'https://picsum.photos/201' }
+diff --git a/frontend/src/views/LoginView.vue b/frontend/src/views/LoginView.vue
+index 259d5ed..f9af1f7 100644
+--- a/frontend/src/views/LoginView.vue
++++ b/frontend/src/views/LoginView.vue
+@@ -1,73 +1,96 @@
+-<template>
+-  <v-container class="fill-height" fluid>
+-    <v-row align="center" justify="center">
+-      <v-col cols="12" sm="8" md="4">
+-        <v-card class="elevation-12 pa-4" rounded="lg">
+-          <v-card-title class="text-h5 text-center font-weight-bold text-primary">
+-            MaisArtesão
+-          </v-card-title>
+-          <v-card-subtitle class="text-center mb-4">
+-            Feira de Artesanato de Currais Novos
+-          </v-card-subtitle>
+-          <v-card-text>
+-            <v-form @submit.prevent="handleLogin">
+-              <v-text-field
+-                v-model="email"
+-                label="E-mail"
+-                prepend-inner-icon="mdi-email"
+-                variant="outlined"
+-                required
+-              />
+-              <v-text-field
+-                v-model="senha"
+-                label="Senha"
+-                type="password"
+-                prepend-inner-icon="mdi-lock"
+-                variant="outlined"
+-                required
+-              />
+-              <v-btn
+-                type="submit"
+-                color="primary"
+-                block
+-                size="large"
+-                class="mt-2"
+-                :loading="loading"
+-              >
+-                Entrar
+-              </v-btn>
+-            </v-form>
+-          </v-card-text>
+-        </v-card>
+-      </v-col>
+-    </v-row>
+-  </v-container>
+-</template>
+-
+-<script setup lang="ts">
+-import { ref } from 'vue'
+-import { useRouter } from 'vue-router'
+-import { useAuthStore } from '@/stores/auth.store'
+-
+-const email = ref('')
+-const senha = ref('')
+-const loading = ref(false)
+-
+-const authStore = useAuthStore()
+-const router = useRouter()
+-
+-const handleLogin = async () => {
+-  try {
+-    loading.value = true
+-    await authStore.login(email.value, senha.value)
+-    
+-    if (authStore.user?.tipo === 'ADMIN') router.push('/admin')
+-    else if (authStore.user?.tipo === 'ARTESAO') router.push('/artesao')
+-    else router.push('/vitrine')
+-  } catch (error) {
+-    alert('Falha na autenticação. Verifique seu e-mail e senha.')
+-  } finally {
+-    loading.value = false
+-  }
+-}
+-</script>
+\ No newline at end of file
++<template>
++  <v-container class="fill-height" fluid>
++    <v-row align="center" justify="center">
++      <v-col cols="12" sm="8" md="4">
++        <v-card class="elevation-12 pa-4" rounded="lg">
++          <v-card-title class="text-h5 text-center font-weight-bold text-primary">
++            MaisArtesão
++          </v-card-title>
++          <v-card-subtitle class="text-center mb-4">
++            Feira de Artesanato de Currais Novos
++          </v-card-subtitle>
++          <v-card-text>
++            <v-alert
++              v-if="errorMessage"
++              type="error"
++              variant="tonal"
++              density="compact"
++              class="mb-4"
++              closable
++              @click:close="errorMessage = ''"
++            >
++              {{ errorMessage }}
++            </v-alert>
++
++            <v-form @submit.prevent="handleLogin">
++              <v-text-field
++                v-model="email"
++                label="E-mail"
++                prepend-inner-icon="mdi-email"
++                variant="outlined"
++                autocomplete="username"
++                required
++              />
++              <v-text-field
++                v-model="senha"
++                label="Senha"
++                type="password"
++                prepend-inner-icon="mdi-lock"
++                variant="outlined"
++                autocomplete="current-password"
++                required
++              />
++              <v-btn
++                type="submit"
++                color="primary"
++                block
++                size="large"
++                class="mt-2"
++                :loading="loading"
++              >
++                Entrar
++              </v-btn>
++            </v-form>
++          </v-card-text>
++        </v-card>
++      </v-col>
++    </v-row>
++  </v-container>
++</template>
++
++<script setup lang="ts">
++import { ref } from 'vue'
++import { useRouter } from 'vue-router'
++import { rotaPorTipo, useAuthStore } from '@/stores/auth.store'
++import { getErrorMessage } from '@/utils/http-error'
++
++const email = ref('')
++const senha = ref('')
++const loading = ref(false)
++const errorMessage = ref('')
++
++const authStore = useAuthStore()
++const router = useRouter()
++
++const handleLogin = async () => {
++  errorMessage.value = ''
++
++  if (!email.value.trim() || !senha.value) {
++    errorMessage.value = 'Informe o e-mail e a senha.'
++    return
++  }
++
++  try {
++    loading.value = true
++    await authStore.login(email.value.trim(), senha.value)
++    router.push(rotaPorTipo(authStore.user?.tipo))
++  } catch (error) {
++    errorMessage.value = getErrorMessage(
++      error,
++      'Falha na autenticação. Verifique seu e-mail e senha.',
++    )
++  } finally {
++    loading.value = false
++  }
++}
++</script>

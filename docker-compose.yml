@@ -4,15 +4,16 @@ services:
     container_name: maisartesao-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: maisartesao
-      POSTGRES_USER: maisartesao_user
-      POSTGRES_PASSWORD: maisartesao123
+      # Mesmas variáveis do .env usadas pelo backend (fonte única das credenciais)
+      POSTGRES_DB: ${DB_DATABASE:-maisartesao}
+      POSTGRES_USER: ${DB_USERNAME:-maisartesao_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-maisartesao123}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U maisartesao_user -d maisartesao"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
