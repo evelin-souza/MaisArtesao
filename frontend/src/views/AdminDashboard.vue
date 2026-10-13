@@ -20,13 +20,22 @@ import { ref, onMounted } from 'vue'
 import { api } from '@/services/api'
 import Navbar from '@/components/Navbar.vue'
 
+
+interface Usuario {
+  id?: number
+  nome: string
+  email: string
+  tipo: string
+}
+
 const headers = [
   { title: 'Nome', key: 'nome' },
   { title: 'E-mail', key: 'email' },
   { title: 'Tipo de Perfil', key: 'tipo' }
 ]
 
-const usuarios = ref([])
+
+const usuarios = ref<Usuario[]>([])
 
 onMounted(async () => {
   try {
