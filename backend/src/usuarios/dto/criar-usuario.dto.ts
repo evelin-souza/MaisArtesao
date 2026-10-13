@@ -23,6 +23,14 @@ export class CriarUsuarioDto {
   @IsNotEmpty()
   telefone: string;
 
+  @IsString()
+  @IsNotEmpty()
+  cpf: string;
+
+  @IsString()
+  @IsNotEmpty()
+  endereco: string;
+
   @IsEnum(TipoUsuario)
   @IsNotEmpty()
   tipo_usuario: TipoUsuario;

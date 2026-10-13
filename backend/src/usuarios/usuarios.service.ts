@@ -9,6 +9,7 @@ import { Usuario } from './usuario.entity';
 import { CriarUsuarioDto } from './dto/criar-usuario.dto';
 import { AtualizarUsuarioDto } from './dto/atualizar-usuario.dto';
 import * as bcrypt from 'bcrypt';
+import { TipoUsuario } from './enums/tipo-usuario.enum';
 
 @Injectable()
 export class UsuariosService {
@@ -75,6 +76,8 @@ export class UsuariosService {
         email: dto.email,
         senha_hash: senhaHash,
         telefone: dto.telefone,
+        cpf: dto.cpf,
+        endereco: dto.endereco,
         tipo_usuario: dto.tipo_usuario,
         ativo: true,
     });
@@ -83,6 +86,13 @@ export class UsuariosService {
     
     return this.removerSenha(usuarioSalvo);
 }
+
+  async criarArtesao(dto: Omit<CriarUsuarioDto, 'tipo_usuario'>) {
+    return this.criar({
+      ...dto,
+      tipo_usuario: TipoUsuario.ARTESAO,
+    });
+  }
 
   async atualizar(id_usuario: number, dto: AtualizarUsuarioDto) {
     const usuario = await this.repository.findOneBy({

@@ -33,6 +33,4 @@ export class Usuario {
 
   @Column({ nullable: true })
   endereco: string;
-  
-
 }
