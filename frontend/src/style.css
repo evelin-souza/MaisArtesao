@@ -1,0 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+
+:root { font-family: 'DM Sans', sans-serif; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+html { min-width: 320px; background: #f6f8fb; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+#app { min-height: 100vh; }
+h1, h2, h3, .v-card-title { font-family: 'Manrope', 'DM Sans', sans-serif !important; }
+.auth-page { background: radial-gradient(circle at top left, #dceeff 0, transparent 36%), linear-gradient(135deg, #f6f8fb 0%, #eef3f9 100%); }
+.page-container { max-width: 1180px; }
+a { text-decoration: none; }
