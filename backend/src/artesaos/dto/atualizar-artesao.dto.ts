@@ -1,12 +1,12 @@
-import {
-  IsNotEmpty,
-  IsString,
-  MaxLength,
-} from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class AtualizarArtesaoDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
-  especialidade: string;
+  especialidade?: string;
+
+  @IsOptional()
+  @IsString()
+  telefone?: string;
 }

@@ -124,9 +124,18 @@ export class ArtesaoService {
       );
     }
 
-    artesao.especialidade = dto.especialidade;
+    if (dto.especialidade !== undefined) {
+      artesao.especialidade = dto.especialidade;
+    }
 
-    await this.artesaoRepository.save(artesao);
+    if (dto.telefone !== undefined) {
+      artesao.usuario.telefone = dto.telefone;
+      await this.usuariosRepository.save(artesao.usuario);
+    }
+
+    if (dto.especialidade !== undefined) {
+      await this.artesaoRepository.save(artesao);
+    }
 
     return this.buscarPorUsuarioId(idUsuario);
   }
