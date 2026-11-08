@@ -1,7 +1,7 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { IsEnum } from 'class-validator';
 import { TipoUsuario } from './enums/tipo-usuario.enum';
-
+import { Cliente } from '../clientes/cliente.entity';
 @Entity('usuario')
 export class Usuario {
   @PrimaryGeneratedColumn()
@@ -33,4 +33,7 @@ export class Usuario {
 
   @Column({ nullable: true })
   endereco: string;
+
+  @OneToOne(() => Cliente, (cliente) => cliente.usuario)
+cliente: Cliente;
 }

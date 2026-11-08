@@ -5,11 +5,12 @@ import {
   PrimaryGeneratedColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 
 import { Usuario } from '../usuarios/usuario.entity';
 import { Categoria } from '../categorias/categoria.entity';
-
+import { MovimentacaoEstoque } from '../movimentacao-estoque/movimentacao-estoque.entity';
 @Entity('produto')
 export class Produto {
   @PrimaryGeneratedColumn({ name: 'id_produto' })
@@ -52,4 +53,7 @@ export class Produto {
     default: () => 'CURRENT_TIMESTAMP',
   })
   data_cadastro: Date;
+
+  @OneToMany(() => MovimentacaoEstoque, (movimentacao) => movimentacao.produto)
+movimentacoesEstoque: MovimentacaoEstoque[];
 }
