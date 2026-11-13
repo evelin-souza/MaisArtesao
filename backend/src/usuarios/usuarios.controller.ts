@@ -14,6 +14,8 @@ import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { ForbiddenException } from '@nestjs/common';
+import { TipoUsuario } from './enums/tipo-usuario.enum';
 
 @Controller('usuarios')
 export class UsuariosController {
@@ -32,9 +34,14 @@ export class UsuariosController {
     return this.service.buscarPorId(id);
   }
 
-  @UseGuards()
   @Post()
   criar(@Body() dto: CriarUsuarioDto) {
+    if (dto.tipo_usuario !== TipoUsuario.CLIENTE) {
+      throw new ForbiddenException(
+        'Este tipo de usuário não pode ser cadastrado por esta rota.',
+      );
+    }
+
     return this.service.criar(dto);
   }
 

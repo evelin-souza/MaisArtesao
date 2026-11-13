@@ -29,6 +29,7 @@
       <ProductFormDialog
         v-model="dialog"
         :initial-data="produtoSelecionado"
+        :loading="salvando"
         @save="salvarProduto"
       />
     </v-container>
@@ -36,9 +37,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import Navbar from '@/components/Navbar.vue'
 import ProductFormDialog, { type ProductFormData } from '@/components/ProductFormDialog.vue'
+import { api } from '@/services/api'
+import { useAuthStore } from '@/stores/auth.store'
+
+const auth = useAuthStore()
+const salvando = ref(false)
 
 const dialog = ref(false)
 const produtoSelecionado = ref<ProductFormData | null>(null)
@@ -51,9 +57,7 @@ const headers = [
   { title: 'Ações', key: 'acoes', sortable: false }
 ]
 
-const produtos = ref<ProductFormData[]>([
-  { id: 1, nome: 'Vaso de Argila Currais Novos', descricao: 'Feito à mão no Seridó', preco: 45.0, foto: 'https://picsum.photos/200' }
-])
+const produtos = ref<ProductFormData[]>([])
 
 const abrirModalCadastro = () => {
   produtoSelecionado.value = null
@@ -65,15 +69,77 @@ const abrirModalEdicao = (item: ProductFormData) => {
   dialog.value = true
 }
 
-const salvarProduto = (dados: ProductFormData) => {
-  if (dados.id) {
-    // Editando
-    const index = produtos.value.findIndex(p => p.id === dados.id)
-    if (index !== -1) produtos.value[index] = dados
-  } else {
-    // Cadastrando novo
-    produtos.value.push({ ...dados, id: Date.now() })
+const carregarProdutos = async () => {
+  try {
+    const response = await api.get('/produtos/me')
+
+    produtos.value = response.data.map((produto: any) => ({
+      id: produto.id_produto,
+      nome: produto.nome,
+      descricao: produto.descricao,
+      preco: Number(produto.preco),
+      foto: produto.imagem_url || '',
+      id_categoria: produto.categoria?.id_categoria ?? null,
+      quantidade_estoque: produto.quantidade_estoque,
+    }))
+  } catch (error) {
+    console.error('Erro ao carregar produtos:', error)
+    alert('Não foi possível carregar seu estoque.')
   }
-  dialog.value = false
 }
+
+const salvarProduto = async (dados: ProductFormData) => {
+  salvando.value = true
+
+  try {
+    const dadosProduto = {
+      nome: dados.nome,
+      descricao: dados.descricao,
+      preco: dados.preco,
+      quantidade_estoque: dados.quantidade_estoque,
+      imagem_url: dados.foto || undefined,
+      id_categoria: dados.id_categoria,
+    }
+
+    if (dados.id) {
+      // Atualizar produto existente
+      await api.patch(
+        `/produtos/${dados.id}`,
+        dadosProduto,
+      )
+    } else {
+      // Cadastrar novo produto
+      await api.post('/produtos', {
+        ...dadosProduto,
+        id_artesao: Number(auth.user?.id),
+      })
+    }
+
+    await carregarProdutos()
+
+    dialog.value = false
+
+    alert(
+      dados.id
+        ? 'Peça atualizada com sucesso!'
+        : 'Peça cadastrada com sucesso!',
+    )
+  } catch (error: any) {
+    console.error('Erro ao salvar produto:', error)
+
+    const mensagem = error.response?.data?.message
+
+    alert(
+      Array.isArray(mensagem)
+        ? mensagem.join('\n')
+        : mensagem || 'Não foi possível salvar a peça.',
+    )
+  } finally {
+    salvando.value = false
+  }
+}
+
+onMounted(() => {
+  carregarProdutos()
+  })
 </script>

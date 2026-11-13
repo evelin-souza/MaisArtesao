@@ -52,8 +52,16 @@ export class AuthService {
       tipo_usuario: usuario.tipo_usuario,
     };
 
+    const access_token = await this.jwtService.signAsync(payload);
+
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      access_token,
+      user: {
+        id_usuario: usuario.id_usuario,
+        nome: usuario.nome,
+        email: usuario.email,
+        tipo_usuario: usuario.tipo_usuario,
+      },
     };
   }
 }
