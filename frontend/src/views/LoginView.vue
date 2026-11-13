@@ -72,13 +72,24 @@ const router = useRouter()
 const handleLogin = async () => {
   try {
     loading.value = true
-    authStore.login(email.value, senha.value)
-    
-    if (authStore.user?.tipo === 'ADMIN') router.push('/admin')
-    else if (authStore.user?.tipo === 'ARTESAO') router.push('/artesao')
-    else router.push('/vitrine')
+
+    await authStore.login(email.value, senha.value)
+
+    if (authStore.user?.tipo === 'ADMIN') {
+      await router.push('/admin')
+    } else if (authStore.user?.tipo === 'ARTESAO') {
+      await router.push('/artesao')
+    } else if (authStore.user?.tipo === 'CLIENTE') {
+      await router.push('/vitrine')
+    } else {
+      throw new Error('Tipo de usuário não reconhecido.')
+    }
   } catch (error) {
-    alert(error instanceof Error ? error.message : 'Falha na autenticação. Verifique seu e-mail e senha.')
+    alert(
+      error instanceof Error
+        ? error.message
+        : 'Falha na autenticação. Verifique seu e-mail e senha.',
+    )
   } finally {
     loading.value = false
   }

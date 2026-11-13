@@ -7,15 +7,24 @@ import {
   Patch,
   Post,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 
 import { ProdutosService } from './produtos.service';
 import { CriarProdutoDto } from './dto/criar-produto.dto';
 import { AtualizarProdutoDto } from './dto/atualizar-produto.dto';
-
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Request } from 'express';
+
+interface RequestAutenticado extends Request {
+  user: {
+    id_usuario: number;
+    email: string;
+    tipo_usuario: string;
+  };
+}
 
 @Controller('produtos')
 export class ProdutosController {
@@ -26,6 +35,13 @@ export class ProdutosController {
   @Get()
   listar() {
     return this.service.listar();
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ARTESAO')
+  listarMeusProdutos(@Req() req: RequestAutenticado) {
+    return this.service.listarPorArtesao(req.user.id_usuario);
   }
 
   @Get(':id')

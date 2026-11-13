@@ -102,6 +102,28 @@ export class ProdutosService {
     );
   }
 
+  async listarPorArtesao(id_usuario: number) {
+    const produtos = await this.produtosRepository.find({
+      where: {
+        artesao: {
+          id_usuario,
+        },
+        status: 'ativo',
+      },
+      relations: {
+        artesao: true,
+        categoria: true,
+      },
+      order: {
+        data_cadastro: 'DESC',
+      },
+    });
+
+    return produtos.map((produto) =>
+      this.removerDadosSensiveis(produto),
+    );
+  }
+
   async buscarPorId(id: number) {
     const produto = await this.produtosRepository.findOne({
       where: {
