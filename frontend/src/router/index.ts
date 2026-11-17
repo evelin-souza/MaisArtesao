@@ -5,6 +5,8 @@ import RegisterView from '@/views/RegisterView.vue'
 import AdminDashboard from '@/views/AdminDashboard.vue'
 import ArtesaoDashboard from '@/views/ArtesaoDashboard.vue'
 import ClienteVitrine from '@/views/ClienteVitrine.vue'
+import ClienteCarrinho from '@/views/ClienteCarrinho.vue'
+import ArtesaoCaixa from '@/views/ArtesaoCaixa.vue'
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -12,7 +14,9 @@ const routes = [
   { path: '/cadastro', component: RegisterView },
   { path: '/admin', component: AdminDashboard, meta: { requiresAuth: true, role: 'ADMIN' } },
   { path: '/artesao', component: ArtesaoDashboard, meta: { requiresAuth: true, role: 'ARTESAO' } },
+  { path: '/artesao/caixa', component: ArtesaoCaixa, meta: { requiresAuth: true, role: 'ARTESAO' } },
   { path: '/vitrine', component: ClienteVitrine, meta: { requiresAuth: true, role: 'CLIENTE' } },
+  { path: '/carrinho', component: ClienteCarrinho, meta: { requiresAuth: true, role: 'CLIENTE' } },
 ]
 
 export const router = createRouter({ history: createWebHistory(), routes })
