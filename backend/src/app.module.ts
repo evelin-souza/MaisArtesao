@@ -11,7 +11,6 @@ import { Categoria } from './categorias/categoria.entity';
 import { ProdutosModule } from './produtos/produtos.module';
 import { CategoriasModule } from './categorias/categorias.module';
 import { Artesao } from './artesaos/artesao.entity';
-import { ArtesaoService } from './artesaos/artesaos.service';
 import { ArtesaoModule } from './artesaos/artesaos.module';
 import { Pagamento } from './pagamentos/pagamento.entity';
 import { Cliente } from './clientes/cliente.entity';
@@ -27,12 +26,13 @@ import { PagamentosModule } from './pagamentos/pagamentos.module';
     ConfigModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: process.env.DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false,
-      },
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT),
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_DATABASE,
       entities: [Usuario, Produto, Categoria, Artesao, MovimentacaoEstoque, ItemVenda, Venda, Cliente, Pagamento],
-      synchronize: true,
+      synchronize: false,
     }),
     UsuariosModule,
     AuthModule,
@@ -47,14 +47,3 @@ import { PagamentosModule } from './pagamentos/pagamentos.module';
   providers: [AppService],
 })
 export class AppModule {}
-
-//TypeOrmModule.forRoot({
-      //type: 'postgres',
-     // host: process.env.DB_HOST,
-      //port: Number(process.env.DB_PORT),
-      //username: process.env.DB_USERNAME,
-      //password: process.env.DB_PASSWORD,
-      ///database: process.env.DB_DATABASE,
-      //entities: [Usuario, Produto, Categoria, Artesao, MovimentacaoEstoque, ItemVenda, Venda, Cliente, Pagamento],
-      //synchronize: true,
-    //}),
